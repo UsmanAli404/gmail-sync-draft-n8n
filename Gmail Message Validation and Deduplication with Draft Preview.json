@@ -1,0 +1,490 @@
+{
+  "name": "Gmail Message Validation and Deduplication with Draft Preview",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "id": "5b655c61-d403-4388-a94f-95ef27caae5b",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        656,
+        2208
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "validateApiUrl",
+              "value": "<__PLACEHOLDER_VALUE__Validation API endpoint URL__>",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "dedupeApiUrl",
+              "value": "<__PLACEHOLDER_VALUE__Deduplication preview API endpoint URL__>",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "gmailLabel",
+              "value": "UNREAD",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "c9efa023-ac46-4722-a8fb-4983f9242005",
+      "name": "Workflow Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        880,
+        2208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "filters": {
+          "labelIds": "={{ [$('Workflow Configuration').first().json.gmailLabel] }}"
+        }
+      },
+      "id": "f0f9ba3b-7980-42c9-836e-d5167619737e",
+      "name": "Fetch Gmail Messages",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1104,
+        2208
+      ],
+      "webhookId": "7046cf2d-f49d-4d74-85a9-3a187d6d4c52"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $input.all().length }}",
+              "rightValue": "0",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3a2b0cc4-0d89-4fb0-997a-bc30a329d90d",
+      "name": "Check If Messages Found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1328,
+        2208
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "sender",
+              "value": "={{ $json.payload.headers.find(h => h.name === 'From')?.value }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "subject",
+              "value": "={{ $json.payload.headers.find(h => h.name === 'Subject')?.value }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "message_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "body_snippet",
+              "value": "={{ $json.snippet }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "03ff6a83-6521-45c2-972f-36db207fcd0e",
+      "name": "Extract Message Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1552,
+        2112
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "sender",
+              "value": "={{ $json.sender }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "subject",
+              "value": "={{ $json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "message_id",
+              "value": "={{ $json.message_id }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "body_snippet",
+              "value": "={{ $json.body_snippet }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2ab49309-57a3-4ac5-a0b0-2e3421c55d70",
+      "name": "Transform to API Format",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1776,
+        2112
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Workflow Configuration').first().json.validateApiUrl }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "610ebd05-245f-4928-b04d-a9ed5c54e29e",
+      "name": "POST to /validate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2000,
+        2112
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $('POST to /validate').item.json.statusCode }}",
+              "rightValue": "200",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "id-2",
+              "leftValue": "={{ $('POST to /validate').item.json.success }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "52651452-ebc0-4994-8260-29caedee9655",
+      "name": "Check Validation Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2224,
+        2112
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Workflow Configuration').first().json.dedupeApiUrl }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "5502af2f-f180-4a04-9c95-34d7cfccd15b",
+      "name": "POST to /dedupe/preview",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2448,
+        2016
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Get validation and deduplication results\nconst validationResult = $('POST to /validate').item.json;\nconst dedupeResult = $('POST to /dedupe/preview').item.json;\nconst originalMessage = $('Extract Message Fields').item.json;\n\n// Build HTML content for the draft\nlet htmlContent = `\n<html>\n<head>\n  <style>\n    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\n    .header { background-color: #4CAF50; color: white; padding: 15px; border-radius: 5px; }\n    .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }\n    .success { background-color: #e8f5e9; }\n    .warning { background-color: #fff3e0; }\n    .info { background-color: #e3f2fd; }\n    .label { font-weight: bold; color: #555; }\n    .value { margin-left: 10px; }\n    table { width: 100%; border-collapse: collapse; margin: 10px 0; }\n    th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }\n    th { background-color: #f5f5f5; }\n    .action-item { margin: 10px 0; padding: 10px; background-color: #f9f9f9; border-left: 4px solid #2196F3; }\n  </style>\n</head>\n<body>\n  <div class=\"header\">\n    <h2>📧 Message Validation & Deduplication Preview</h2>\n  </div>\n  \n  <div class=\"section info\">\n    <h3>Original Message Details</h3>\n    <p><span class=\"label\">From:</span><span class=\"value\">${originalMessage.from || 'N/A'}</span></p>\n    <p><span class=\"label\">Subject:</span><span class=\"value\">${originalMessage.subject || 'N/A'}</span></p>\n    <p><span class=\"label\">Date:</span><span class=\"value\">${originalMessage.date || 'N/A'}</span></p>\n    <p><span class=\"label\">Message ID:</span><span class=\"value\">${originalMessage.messageId || 'N/A'}</span></p>\n  </div>\n  \n  <div class=\"section ${validationResult.valid ? 'success' : 'warning'}\">\n    <h3>✓ Validation Results</h3>\n    <p><span class=\"label\">Status:</span><span class=\"value\">${validationResult.valid ? '✅ Valid' : '⚠️ Invalid'}</span></p>\n    ${validationResult.errors && validationResult.errors.length > 0 ? `\n      <p><span class=\"label\">Errors:</span></p>\n      <ul>\n        ${validationResult.errors.map(err => `<li>${err}</li>`).join('')}\n      </ul>\n    ` : ''}\n    ${validationResult.warnings && validationResult.warnings.length > 0 ? `\n      <p><span class=\"label\">Warnings:</span></p>\n      <ul>\n        ${validationResult.warnings.map(warn => `<li>${warn}</li>`).join('')}\n      </ul>\n    ` : ''}\n  </div>\n  \n  <div class=\"section info\">\n    <h3>🔍 Deduplication Analysis</h3>\n    <p><span class=\"label\">Duplicates Found:</span><span class=\"value\">${dedupeResult.duplicatesFound || 0}</span></p>\n    <p><span class=\"label\">Unique Messages:</span><span class=\"value\">${dedupeResult.uniqueMessages || 0}</span></p>\n    \n    ${dedupeResult.duplicates && dedupeResult.duplicates.length > 0 ? `\n      <h4>Duplicate Messages Detected:</h4>\n      <table>\n        <thead>\n          <tr>\n            <th>Message ID</th>\n            <th>Subject</th>\n            <th>Similarity</th>\n            <th>Action</th>\n          </tr>\n        </thead>\n        <tbody>\n          ${dedupeResult.duplicates.map(dup => `\n            <tr>\n              <td>${dup.messageId || 'N/A'}</td>\n              <td>${dup.subject || 'N/A'}</td>\n              <td>${dup.similarity ? (dup.similarity * 100).toFixed(1) + '%' : 'N/A'}</td>\n              <td>${dup.action || 'Archive'}</td>\n            </tr>\n          `).join('')}\n        </tbody>\n      </table>\n    ` : '<p>No duplicates detected.</p>'}\n  </div>\n  \n  <div class=\"section\">\n    <h3>📋 Recommended Actions</h3>\n    ${dedupeResult.actions && dedupeResult.actions.length > 0 ? \n      dedupeResult.actions.map(action => `\n        <div class=\"action-item\">\n          <strong>${action.type || 'Action'}:</strong> ${action.description || 'No description'}\n        </div>\n      `).join('') \n      : '<p>No specific actions recommended.</p>'}\n  </div>\n  \n  <div class=\"section info\">\n    <h3>ℹ️ Summary</h3>\n    <p>This is a preview of the validation and deduplication analysis. Review the results above before taking any action.</p>\n    <p><em>Generated: ${new Date().toLocaleString()}</em></p>\n  </div>\n</body>\n</html>\n`;\n\n// Return the formatted HTML content\nreturn {\n  json: {\n    htmlContent: htmlContent,\n    subject: `Re: ${originalMessage.subject || 'Message'} - Validation & Deduplication Preview`,\n    to: originalMessage.from || '',\n    threadId: originalMessage.threadId || ''\n  }\n};"
+      },
+      "id": "b84287f0-4234-4bb5-9a91-b324cd5539d8",
+      "name": "Format Draft Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2672,
+        2016
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "=Gmail Processing Preview - {{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.draftBody }}",
+        "options": {}
+      },
+      "id": "21352ef9-b08c-4cff-baf0-692d667ebd6c",
+      "name": "Create Gmail Draft",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2896,
+        2016
+      ],
+      "webhookId": "09b51e57-5a95-4d25-b255-9a67b0246b85"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Log successful processing\nconst timestamp = new Date().toISOString();\nconst messageId = $input.item.json.messageId || 'N/A';\nconst draftId = $input.item.json.id || 'N/A';\n\nconsole.log(`[${timestamp}] SUCCESS: Message processed successfully`);\nconsole.log(`  Message ID: ${messageId}`);\nconsole.log(`  Draft Created: ${draftId}`);\nconsole.log(`  Draft creation confirmed`);\n\nreturn {\n  json: {\n    status: 'success',\n    timestamp: timestamp,\n    messageId: messageId,\n    draftId: draftId,\n    message: 'Message processed and draft created successfully'\n  }\n};"
+      },
+      "id": "8a7ef226-6c40-4ff3-bd56-f54178b7c4d1",
+      "name": "Log Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        2016
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Log validation failure\nconst timestamp = new Date().toISOString();\nconst messageId = $input.item.json.messageId || 'unknown';\nconst validationResponse = $input.item.json;\n\nconsole.log('=== VALIDATION FAILURE ===');\nconsole.log('Timestamp:', timestamp);\nconsole.log('Message ID:', messageId);\nconsole.log('Validation Response:', JSON.stringify(validationResponse, null, 2));\n\nreturn {\n  json: {\n    status: 'validation_failed',\n    timestamp: timestamp,\n    messageId: messageId,\n    error: validationResponse.error || validationResponse,\n    validationResponse: validationResponse\n  }\n};"
+      },
+      "id": "3e49940c-247a-445f-bbf0-744e8e9af82d",
+      "name": "Log Validation Failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2448,
+        2208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log that no messages were found\nconst timestamp = new Date().toISOString();\nconsole.log(`[${timestamp}] No messages found to process`);\n\n// Return the input items\nreturn $input.all();"
+      },
+      "id": "09a46478-78a5-46da-8e15-971b498151ea",
+      "name": "Log No Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        2304
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Workflow Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Configuration": {
+      "main": [
+        [
+          {
+            "node": "Fetch Gmail Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Gmail Messages": {
+      "main": [
+        [
+          {
+            "node": "Check If Messages Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Messages Found": {
+      "main": [
+        [
+          {
+            "node": "Extract Message Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log No Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Message Fields": {
+      "main": [
+        [
+          {
+            "node": "Transform to API Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform to API Format": {
+      "main": [
+        [
+          {
+            "node": "POST to /validate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST to /validate": {
+      "main": [
+        [
+          {
+            "node": "Check Validation Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Validation Success": {
+      "main": [
+        [
+          {
+            "node": "POST to /dedupe/preview",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Validation Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST to /dedupe/preview": {
+      "main": [
+        [
+          {
+            "node": "Format Draft Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Draft Message": {
+      "main": [
+        [
+          {
+            "node": "Create Gmail Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Gmail Draft": {
+      "main": [
+        [
+          {
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "807b2af4-c4c4-428c-bc91-54d25eb93c5e",
+  "meta": {
+    "instanceId": "d8921c2f0fc06876b84cac0c6f14383a7aeeaac1513d9846d9a3c30cae9520c1"
+  },
+  "id": "KEvRPy8tUBwQEcrU",
+  "tags": []
+}
